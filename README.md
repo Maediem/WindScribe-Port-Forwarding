@@ -1,14 +1,13 @@
 # Windscribe Port Forwarding Automation
 
-This script automates the process of renewing an ephemeral port on Windscribe and applying the new port to other services like qBittorrent and Docker containers. This script was made for Linux by using .env files.
+This script automates the process of renewing an ephemeral port on Windscribe and applying the new port to services like qBittorrent and/or Docker containers. This script was made for Linux by using .env files.
 
 ## Features
 
--   **Automated Login**: Logs into Windscribe using credentials, saving session cookies to speed up subsequent runs.
+-   **Automated Login**: Logs into Windscribe using credentials (via .env file), saving session cookies to speed up subsequent runs.
 -   **Port Renewal**: Navigates the Windscribe account page to delete the existing ephemeral port and request a new one.
--   **Configuration Update**: Automatically updates a `.env` file with the new port number.
 -   **qBittorrent Integration**: (Optional) Updates the listening port in a running qBittorrent instance via its Web API.
--   **Docker Integration**: (Optional) Restarts specified Docker Compose services to apply the new port forwarding settings.
+-   **Docker Integration**: (Optional) Automatically updates a `.env` file with the new port number. Restarts specified docker-compose (e.g. gluetun & qbittorrent) services to apply the new port forwarding settings.
 
 ## Requirements
 
@@ -34,10 +33,14 @@ pip install selenium python-dotenv qbittorrent-api
 
 ## Configure Environment Files
 
-You need to create two environment files to store your credentials and configuration.
+You need to create environment file(s) to store your credentials and configuration. Since the docker should not use the same credentials, one envronment file is use for this script and one for the dockers.
+
+**Please ensure access based on the principle of least privilege.**
+
+
 ## Credentials File
 
-Create a file named credentials.env in the location you specify in the script (/path/to/scripts/credentials.env by default). This file stores your sensitive login information.
+Create a file named credentials.env in the location you specify in the script (/path/to/scripts/credentials.env by default). This file stores your sensitive login information for the VPN. If you are using qBittorrent directly on your machine, you can add those info as well.
 
 Template for credentials.env:
 
@@ -60,7 +63,7 @@ Example .env file:
 
 ```bash
 # This variable will be managed by the script
-VPN_PORT_FORWARDED=12345
+VPN_PORT_FORWARDED='12345'
 ```
 
 ## You must edit the main Python script to match your setup.
