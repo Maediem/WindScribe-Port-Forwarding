@@ -129,10 +129,15 @@ You can also set this up as a scheduled task (e.g., a cron job) to automatically
 
 ## Troubleshooting
 
-```
-selenium.common.exceptions.SessionNotCreatedException: This usually means your chromedriver version does not match your Google Chrome version, or there are permission issues. Ensure both are up-to-date.
+> **selenium.common.exceptions.SessionNotCreatedException**  
+> This usually means your chromedriver version does not match your Google Chrome  
+> version, or there are permission issues. Ensure both are up-to-date.  
+>
+> **FileNotFoundError: [Errno 2] No such file or directory: 'docker-compose'**  
+> The docker-compose executable is not in your system's PATH.  
+>
+> **Permission Denied**  
+> The script may not have permission to read/write the specified file paths  
+> (e.g., `COOKIES_FILE`, `ENV_FILE`). Ensure the user running the script has  
+> the correct permissions.
 
-FileNotFoundError: [Errno 2] No such file or directory: 'docker-compose': The docker-compose executable is not in your system's PATH.
-
-Permission Denied: The script may not have permission to read/write the specified file paths (e.g., COOKIES_FILE, ENV_FILE). Ensure the user running the script has the correct permissions.
-```
