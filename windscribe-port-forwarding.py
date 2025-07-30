@@ -1,3 +1,7 @@
+#########################################################################################################################
+# WARNING: Running this script repeatedly or in rapid succession may result in your account being temporarily disabled. #
+#########################################################################################################################
+
 # Import standard and third-party libraries
 import os
 import pickle
@@ -14,7 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 # Environment variable handling
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv, set_key, get_key
 
 # qBittorrent API
 from qbittorrentapi import Client, LoginFailed
@@ -31,11 +35,13 @@ ENABLE_QBITTORRENT_UPDATE = False     # Enable or disable qBittorrent port updat
 ENABLE_DOCKER_RESTART = True          # Enable or disable Docker container restart
 
 # --- Docker Configuration ---
-DOCKER_COMPOSE_FILE = "/path/to/master-compose.yml"   # Path to your docker-compose YAML file
-DOCKER_VPN_INSTANCE = "gluetun"                       # Name of the VPN container
-DOCKER_QBIT_INSTANCE = "qbittorrent"                  # Name of the qBittorrent container
+# Change the path to the proper directory
+ROOT_DIR = "/data/docker"
+DOCKER_COMPOSE_FILE = os.path.join(ROOT_DIR, "master-docker-compose.yml")
+DOCKER_VPN_INSTANCE = "gluetun-openvpn"
+DOCKER_QBIT_INSTANCE = "qb-private"
 
-# Command used to restart the dockers
+# Command used to restart the dockers if enabled
 DOCKER_RESTART_CMD = [
             "docker-compose", "-f", DOCKER_COMPOSE_FILE,
             "up", "-d", "--force-recreate",
@@ -43,18 +49,21 @@ DOCKER_RESTART_CMD = [
 ]
 
 # --- File Configuration ---
-LOG_FILE = "/var/log/windscribe-port-forwarding.log"       # File to store logging if enabled
-LOG_TO_FILE = True                                         # True = Enable logging
-COOKIES_FILE = "/path/to/windscribe.cookies"               # File to store cookies for Windscribe login
-ENV_FILE = "/path/to/docker/compose/.env"                  # Docker .env file to store the forwarded port
-CREDENTIALS_ENV_FILE = "/path/to/scripts/credentials.env"  # File with Windscribe and qBittorrent credentials
+# Change the path to the proper directories
+LOG_FILE = "/var/log/windscribe-port-forwarding.log"                        # File to store logging if enabled
+LOG_TO_FILE = True                                                          # True = Enable logging
+COOKIES_FILE = os.path.join(ROOT_DIR, "scripts", "windscribe.cookies")      # File to store cookies for Windscribe login
+CREDENTIALS_ENV_FILE = os.path.join(ROOT_DIR, "scripts", "credentials.env") # File with Windscribe and qBittorrent credentials
+ENV_FILE = os.path.join(ROOT_DIR, ".env")                                   # Docker .env file to store the forwarded port
+
 
 # --- Load environment variables ---
 load_dotenv(CREDENTIALS_ENV_FILE)
 load_dotenv(ENV_FILE)
 
 # --- Extract credentials and settings from environment ---
-VPN_PORT_FORWARDED = os.getenv("VPN_PORT_FORWARDED")
+ENV_KEY_PORT_FORWARDED  = "VPN_PORT_FORWARDED"          # # Variable used because it is used in the script for updating .env file.
+VPN_PORT_FORWARDED = os.getenv(ENV_KEY_PORT_FORWARDED)
 
 WS_USERNAME = os.getenv("WS_USERNAME")
 WS_PASSWORD = os.getenv("WS_PASSWORD")
@@ -149,14 +158,24 @@ def login_windscribe():
         exit(1)
 
 # Update the Docker .env file with the new forwarded port.
-def update_env_file(new_port):
-    if set_key(ENV_FILE, "VPN_PORT_FORWARDED", new_port):
-        print_message("INFO", f"Updated {ENV_FILE} with VPN_PORT_FORWARDED={new_port}")
+def update_env_file(new_port, timeout=5):
+    if set_key(ENV_FILE, ENV_KEY_PORT_FORWARDED, new_port):
+        # Poll until the environment reflects the change
+        start = time.time()
+        
+        while time.time() - start < timeout:
+            load_dotenv(ENV_FILE, override=True)
+            tmp = os.getenv(ENV_KEY_PORT_FORWARDED)
+            
+            if tmp == new_port:
+                print_message("INFO", f"Updated '{ENV_FILE}' with '{ENV_KEY_PORT_FORWARDED}={new_port}'")
+                break
+            
+            time.sleep(1)
+        else:
+            print_message("WARN", f"{ENV_FILE} was not updated as expected within {timeout} seconds.")
     else:
         print_message("ERROR", f"Could not update {ENV_FILE}. Please check file permissions.")
-
-    # Add 1 sec. sleep to ensure the file is saved and can be used by the docker restart
-    time.sleep(1)
 
 # Update qBittorrent's listening port using the qBittorrent Web API.
 def update_qbittorrent_port(new_port):
@@ -206,7 +225,7 @@ def restart_docker_containers(new_port=None):
             print_message("ERROR", "Docker-compose failed.")
 
             # True is to print only. If required it can be added in log file by removing "True".
-            if e.stderr
+            if e.stderr:
                 print_message("DEBUG" f"[DOCKER STDERR]: {e.stderr}")
         except Exception as e:
             print_message("ERROR", f"Unexpected error during Docker restart: {e}")
