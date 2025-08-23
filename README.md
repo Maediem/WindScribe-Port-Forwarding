@@ -2,6 +2,10 @@
 
 This script automates the process of renewing an ephemeral port on Windscribe and applying the new port to services like qBittorrent and/or Docker containers. This script was made for Linux by using .env files.
 
+> **⚠️ Important note on your connection**
+> 
+> For the highest chance of success, run this script from a machine with a standard internet connection (e.g., your home network), **not** from behind another VPN. VPN IP addresses are often flagged by websites, which triggers aggressive CAPTCHAs and security challenges that can cause the script to fail.
+
 ## Features
 
 -   **Automated Login**: Logs into Windscribe using credentials (via .env file), saving session cookies to speed up subsequent runs.
@@ -11,34 +15,36 @@ This script automates the process of renewing an ephemeral port on Windscribe an
 
 ## Requirements
 
--   Python 3.8+
--   `pip` (Python package installer)
--   `docker-compose` installed and accessible in the system's PATH.
--   A running instance of Google Chrome/Chromium.
--   `chromedriver` matching your Chrome version, installed and accessible in your system's PATH.
--   - Reading access to the .env variables
+This section details everything you need to run the script successfully.
 
-## Setup and Configuration
+### System & Software
 
-Follow these steps carefully to set up the script for your environment.
+- Python 3.8+: The script uses modern Python syntax.
+- Google Chrome / Chromium: The script uses Selenium to drive a Chrome-based browser.
+- Docker & Docker Compose: Required only if ENABLE_DOCKER_RESTART is set to True. The docker-compose command must be accessible in your system's PATH.
+- (Optional but Recommended) FlareSolverr: Required only if using the flaresolverr login method. You must have a running instance of FlareSolverr (can run on a docker). The script is pre-configured to connect to it at http://localhost:8191.
 
-### 1. Install Python Dependencies
+    Note on chromedriver: Modern versions of Selenium (which this script uses) include Selenium Manager, which automatically downloads and manages the correct chromedriver for you. You do not need to manually install chromedriver or add it to your PATH.
 
-Install the required Python libraries using `pip`:
+### Python Packages
+
+All required Python packages can be installed with a single command:
 
 ```bash
-pip install selenium python-dotenv qbittorrent-api
+pip install requests selenium selenium-stealth python-dotenv qbittorrent-api
 ```
+  
 
+## Configuration & File Permissions
 
-## Configure Environment Files
+The script requires a specific file structure and permissions to function correctly. All paths are relative to the ROOT_DIR variable you set in the script.
 
 You need to create environment file(s) to store your credentials and configuration. Since the docker should not use the same credentials, one envronment file is use for this script and one for the dockers.
 
 **Please ensure access based on the principle of least privilege.**
 
 
-## Credentials File
+### Credentials File
 
 Create a file named credentials.env in the location you specify in the script (/path/to/scripts/credentials.env by default). This file stores your sensitive login information for the VPN. If you are using qBittorrent directly on your machine, you can add those info as well.
 
@@ -55,7 +61,7 @@ QBIT_USERNAME="your_qbit_username"
 QBIT_PASSWORD="your_qbit_password"
 ```
 
-B. Docker Environment File
+### Docker Environment File
 
 If enabled, this script reads and writes to the .env file used by your docker-compose setup. Make sure the path is correct in the script.
 
@@ -66,7 +72,7 @@ Example .env file:
 VPN_PORT_FORWARDED='12345'
 ```
 
-## You must edit the main Python script to match your setup.
+### You must edit the main Python script to match your setup.
 Open the script and modify the variables below the section:
 ```python
 #############
@@ -115,6 +121,19 @@ ENV_FILE = "/path/to/docker/.env"
 CREDENTIALS_ENV_FILE = "/path/to/project/credentials.env"
 ```
 
+D. Login method and Flaresolverr URL
+Update these variables to reflect the login method you want to use.
+
+```python
+# --- Login Configuration ---
+# Choose "flaresolverr" (recommended) or "selenium".
+LOGIN_METHOD = "flaresolverr"
+
+# --- FlareSolverr Configuration ---
+# URL of your running FlareSolverr instance.
+FLARESOLVERR_URL = "http://localhost:8191/v1"
+```
+
 ## Usage
 
 Once everything is configured, you can run the script from your terminal:
@@ -126,18 +145,3 @@ python3 /path/to/your/script.py
 The script will print its progress to the console. The first run will be slower as it needs to perform a full login. Subsequent runs will use the saved windscribe.cookies file for faster authentication.
 
 You can also set this up as a scheduled task (e.g., a cron job) to automatically refresh your port periodically.
-
-## Troubleshooting
-
-> **selenium.common.exceptions.SessionNotCreatedException**  
-> This usually means your chromedriver version does not match your Google Chrome  
-> version, or there are permission issues. Ensure both are up-to-date.  
->
-> **FileNotFoundError: [Errno 2] No such file or directory: 'docker-compose'**  
-> The docker-compose executable is not in your system's PATH.  
->
-> **Permission Denied**  
-> The script may not have permission to read/write the specified file paths  
-> (e.g., `COOKIES_FILE`, `ENV_FILE`). Ensure the user running the script has  
-> the correct permissions.
-
