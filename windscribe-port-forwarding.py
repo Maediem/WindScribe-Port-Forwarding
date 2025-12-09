@@ -37,71 +37,105 @@ from qbittorrentapi import Client, LoginFailed
 # VARIABLES #
 #############
 
-# --- Login Configuration ---
-# Choose the login method: "selenium" or "flaresolverr"
-# "selenium": Uses browser automation only. Faster, but likely to be blocked by CAPTCHA. Uses cookies to persist sessions.
-# "flaresolverr": Hybrid method. Uses FlareSolverr to bypass CAPTCHA, then Selenium to interact. Most robust option.
-LOGIN_METHOD = "flaresolverr"  # <-- CHANGE THIS TO "selenium" OR "flaresolverr"
+#--------------------------
+# USER CUSTOM CONFIGURATION
+#--------------------------
 
-# A list of realistic user-agents to be used when LOGIN_METHOD is "selenium".
-# This helps mimic different browsers and operating systems to reduce blocking likelihood.
-USER_AGENTS = [
-    # Windows 10/11
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+# --- Paths ---
+ROOT_DIR = "/data/docker" # If empty, defaults to directory of this script.
+DOCKER_COMPOSE_FILE = os.path.join(ROOT_DIR, "master-docker-compose.yml") # Can change the docker compose file name if using docker
+ENV_FILE = os.path.join(ROOT_DIR, ".env")
+COOKIES_FILE = os.path.join(ROOT_DIR, "scripts", "windscribe.cookies") # This will write the cookie data in the following file: /data/docker/scripts/windscribe.cookies
+SCREENSHOT_DIR = os.path.join(ROOT_DIR, "scripts", "screenshots")
 
-    # macOS
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:126.0) Gecko/20100101 Firefox/126.0"
-]
+# --- Core Settings ---
+LOGIN_METHOD = "flaresolverr"                 # "selenium" or "flaresolverr"
+FLARESOLVERR_URL = "http://localhost:8191/v1" # Only used if LOGIN_METHOD is "flaresolverr"
 
-# --- FlareSolverr Configuration ---
-# Only used if LOGIN_METHOD is "flaresolverr"
-FLARESOLVERR_URL = "http://localhost:8191/v1"
+# --- Feature Flags ---
+ENABLE_QBITTORRENT_UPDATE = False  # Enable or disable qBittorrent port update
+ENABLE_DOCKER_RESTART = True       # Enable or disable Docker container restart
 
-# --- Configuration Flags ---
-ENABLE_QBITTORRENT_UPDATE = False     # Enable or disable qBittorrent port update
-ENABLE_DOCKER_RESTART = True          # Enable or disable Docker container restart
-
-# --- Docker Configuration ---
-# Change the path to the proper directory
-ROOT_DIR = "/path/to/root/directory"
-DOCKER_COMPOSE_FILE = os.path.join(ROOT_DIR, "master-docker-compose.yml")
-DOCKER_VPN_INSTANCE = "gluetun-openvpn"
+# --- Docker Settings ---
+DOCKER_VPN_INSTANCE  = "gluetun-openvpn"
 DOCKER_QBIT_INSTANCE = "qb-private"
 
-# Command used to restart the dockers if enabled
-DOCKER_RESTART_CMD = [
-            "docker-compose", "-f", DOCKER_COMPOSE_FILE,
-            "up", "-d", "--force-recreate",
-            DOCKER_VPN_INSTANCE, DOCKER_QBIT_INSTANCE
-]
+# --- Logging ---
+LOG_FILE = "/var/log/windscribe-port-forwarding.log"
+LOG_TO_FILE = True
 
-# --- File Configuration ---
-# Change the path to the proper directories
-LOG_FILE = "/var/log/windscribe-port-forwarding.log"                        # File to store logging if enabled
-LOG_TO_FILE = True                                                          # True = Enable logging
-COOKIES_FILE = os.path.join(ROOT_DIR, "scripts", "windscribe.cookies")      # File to store cookies for Windscribe login
-CREDENTIALS_ENV_FILE = os.path.join(ROOT_DIR, "scripts", "credentials.env") # File with Windscribe & qBittorrent credentials
-ENV_FILE = os.path.join(ROOT_DIR, ".env")                                   # Docker .env file to store the forwarded port
-SCREENSHOT_DIR = os.path.join(ROOT_DIR, "scripts", "screenshots")           # Directory to save screenshots on failure (useful for troubleshooting)
+# --- Manual Credentials (optional) ---
+# If left empty (""), script will fall back to environment variables.
+WS_USERNAME   = ""           # Windscribe username
+WS_PASSWORD   = ""           # Windscribe password
 
-# --- Load environment variables ---
+QBIT_HOST     = ""           # Example: "http://localhost:8080"
+QBIT_USERNAME = ""
+QBIT_PASSWORD = ""
+
+
+#---------------------------------------
+# INTERNAL CONFIGURATION (DO NOT MODIFY)
+#---------------------------------------
+
+# Set default ROOT_DIR if empty
+if ROOT_DIR == "":
+    ROOT_DIR = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
+
+# Ensure credentials.env fallback
+CREDENTIALS_ENV_FILE = os.path.join(ROOT_DIR, "scripts", "credentials.env")
+if not os.path.isfile(CREDENTIALS_ENV_FILE):
+    CREDENTIALS_ENV_FILE = os.path.join(ROOT_DIR, "credentials.env")
+
+# Load environment variables
 load_dotenv(CREDENTIALS_ENV_FILE)
 load_dotenv(ENV_FILE)
-
-# --- Extract credentials and settings from environment ---
 ENV_KEY_PORT_FORWARDED  = "VPN_PORT_FORWARDED"
 VPN_PORT_FORWARDED = os.getenv(ENV_KEY_PORT_FORWARDED)
-WS_USERNAME = os.getenv("WS_USERNAME")
-WS_PASSWORD = os.getenv("WS_PASSWORD")
-QBIT_HOST = os.getenv("QBIT_HOST")
-QBIT_USERNAME = os.getenv("QBIT_USERNAME")
-QBIT_PASSWORD = os.getenv("QBIT_PASSWORD")
+
+# --- Fill values from environment if user left them empty ---
+WS_USERNAME   = WS_USERNAME   or os.getenv("WS_USERNAME", "")
+WS_PASSWORD   = WS_PASSWORD   or os.getenv("WS_PASSWORD", "")
+QBIT_HOST     = QBIT_HOST     or os.getenv("QBIT_HOST", "")
+QBIT_USERNAME = QBIT_USERNAME or os.getenv("QBIT_USERNAME", "")
+QBIT_PASSWORD = QBIT_PASSWORD or os.getenv("QBIT_PASSWORD", "")
+
+
+# Docker restart command
+DOCKER_RESTART_CMD = [
+    "docker-compose", "-f", DOCKER_COMPOSE_FILE,
+    "up", "-d", "--force-recreate",
+    DOCKER_VPN_INSTANCE, DOCKER_QBIT_INSTANCE
+]
+
+
+##########################
+# VALIDATION (SAFE EXIT) #
+##########################
+
+# --- Windscribe credentials are ALWAYS required ---
+if not WS_USERNAME or not WS_PASSWORD:
+    print("[ERROR] Missing Windscribe credentials: WS_USERNAME / WS_PASSWORD")
+    print("        Provide them manually OR set them in credentials.env")
+    sys.exit(1)
+
+# --- FlareSolverr must exist for flaresolverr login ---
+if LOGIN_METHOD == "flaresolverr":
+    if not FLARESOLVERR_URL:
+        print("[ERROR] LOGIN_METHOD is 'flaresolverr', but FLARESOLVERR_URL is empty.")
+        sys.exit(1)
+
+# --- Docker validation ---
+if ENABLE_DOCKER_RESTART:
+    if not os.path.isfile(DOCKER_COMPOSE_FILE):
+        print(f"[ERROR] Docker restart enabled, but docker-compose file missing:\n{DOCKER_COMPOSE_FILE}")
+        sys.exit(1)
+
+# --- qBittorrent validation ---
+if ENABLE_QBITTORRENT_UPDATE:
+    if not (QBIT_HOST and QBIT_USERNAME and QBIT_PASSWORD):
+        print("[ERROR] qBittorrent update enabled, but required credentials are missing.")
+        sys.exit(1)
 
 
 
@@ -311,7 +345,7 @@ print_message("INFO", "Script started.")
 driver = None
 wait = None
 
-# Configure Chrome Options
+# --- Configure Chrome Options ---
 chrome_options = Options()
 chrome_options.add_argument("--headless")
 chrome_options.add_argument("--no-sandbox")
@@ -319,6 +353,7 @@ chrome_options.add_argument("--disable-dev-shm-usage")
 chrome_options.add_argument("--disable-gpu")
 chrome_options.add_argument("--window-size=1920,1000") # More "human" default to simulate a maximized browser on a 1080p screen
 
+# --- Login ---
 if LOGIN_METHOD == "flaresolverr":
     print_message("INFO", "Using login method: Hybrid (FlareSolverr + Selenium)")
     fs_solution = get_flaresolverr_clean_session("https://windscribe.com/login")
@@ -375,51 +410,73 @@ else:
     print_message("ERROR", f"Invalid LOGIN_METHOD: '{LOGIN_METHOD}'. Please choose 'selenium' or 'flaresolverr'.")
     exit(1)
 
-# Requesting Port Forwarding after successful login
+# --- Getting the Ephemeral Port ---
 new_port = None
 try:
     print_message("INFO", "Navigating to Windscribe's port forwarding page...")
     wait_and_click(By.ID, "menu-ports")
-    
-    print_message("INFO", "Switching to ephemeral port section...")
-    wait_and_click(By.ID, "pf-eph-btn")
+    wait.until(EC.presence_of_element_located((By.ID, "ports-main-tab")))
+
+    print_message("INFO", "Looking for existing Ephemeral Port (fully dynamic)...")
+
+    # Dynamic, case-insensitive match for "Ephemeral Port" anywhere within a pf-item
+    eph_item_xpath = (
+        "//div[contains(@class,'pf-item') and "
+        "contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'ephemeral port')]"
+    )
 
     try:
-        print_message("INFO", "Checking for existing port to delete...")
-        
-        # A short wait to ensure the button appears after the previous click
-        time.sleep(random.uniform(1.6, 3.2))
-        
-        delete_button = driver.find_element(By.XPATH, "//button[normalize-space()='Delete Port']")
-        
-        wait_and_click(By.XPATH, "//button[normalize-space()='Delete Port']")
-        wait.until(EC.invisibility_of_element_located((By.XPATH, "//button[normalize-space()='Delete Port']")))
-        
-        print_message("INFO", "Existing port deleted.")
-    except (NoSuchElementException, TimeoutException):
-        print_message("INFO", "No existing port found to delete.")
+        eph_item = wait.until(EC.presence_of_element_located((By.XPATH, eph_item_xpath)))
+        print_message("INFO", "Ephemeral Port entry found.")
 
-    print_message("INFO", "Requesting new matching port...")
-    wait_and_click(By.XPATH, "//button[normalize-space()='Request Matching Port']")
+        # Find the toggle button inside this pf-item
+        toggle_btn = eph_item.find_element(By.CSS_SELECTOR, "button.pf-info-toggle")
+        toggle_btn.click()
+        print_message("INFO", "Opened EPF menu.")
 
-    port_element = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "#epf-port-info > span")))
-    new_port_str = port_element.text
-    
-    if new_port_str and new_port_str.isdigit():
+        # Click "Delete" from the dropdown (dynamic text match)
+        delete_xpath = ".//li[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'delete')]"
+        delete_option = wait.until(EC.element_to_be_clickable((By.XPATH, delete_xpath)))
+        delete_option.click()
+
+        # Wait for deletion to finish
+        wait.until(EC.invisibility_of_element_located((By.XPATH, eph_item_xpath)))
+        print_message("INFO", "Old Ephemeral Port deleted.")
+
+    except TimeoutException:
+        print_message("INFO", "No existing Ephemeral Port found. Continuing...")
+
+    # Request a new port
+    print_message("INFO", "Requesting a new ephemeral port...")
+    try:
+        wait_and_click(By.XPATH, "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'request') and contains(., 'Port')]")
+    except Exception:
+        print_message("WARNING", "Request button not found; proceeding to read existing port if present.")
+
+    # Extract port (pf-ext takes priority)
+    print_message("INFO", "Extracting ephemeral port value...")
+
+    port_xpath = (eph_item_xpath + "//span[contains(@class,'pf-ext') or contains(@class,'pf-int')]")
+    port_elem = wait.until(EC.visibility_of_element_located((By.XPATH, port_xpath)))
+    new_port_str = port_elem.text.strip()
+
+    if new_port_str.isdigit():
         new_port = int(new_port_str)
-        print_message("INFO", f"Acquired new port from Windscribe: {new_port}")
+        print_message("INFO", f"Acquired ephemeral port: {new_port}")
     else:
-        raise ValueError(f"Could not extract a valid port. Found: '{new_port_str}'")
+        raise ValueError(f"Windscribe returned invalid port: '{new_port_str}'")
 
-except (Exception) as e: # Catch any exception during this critical block
-    print_message("ERROR", f"A critical step failed while getting port from Windscribe: {e}")
+except Exception as e:
+    print_message("ERROR", f"Critical error in port-forward automation: {e}")
+
     os.makedirs(SCREENSHOT_DIR, exist_ok=True)
-    
-    screenshot_path = os.path.join(SCREENSHOT_DIR, f"interaction_failure_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+    screenshot_path = os.path.join(
+        SCREENSHOT_DIR,
+        f"failure_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    )
     driver.save_screenshot(screenshot_path)
-    
-    print_message("INFO", f"Screenshot saved to: {screenshot_path}")
-    
+    print_message("INFO", f"Screenshot saved at {screenshot_path}")
+
     if driver:
         driver.quit()
     exit(1)
@@ -428,7 +485,7 @@ finally:
     if driver:
         driver.quit()
 
-# Post-Requesting Port Forwarding
+# --- Post-Requesting Port Forwarding ---
 if new_port:
     if ENABLE_QBITTORRENT_UPDATE:
         update_qbittorrent_port(new_port)
