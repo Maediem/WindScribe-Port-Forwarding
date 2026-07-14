@@ -235,20 +235,32 @@ def perform_selenium_login():
     try:
         print_message("INFO", "Performing login actions with Selenium...")
         
-        username_field = wait.until(EC.visibility_of_element_located((By.ID, "username")))
+        # Locate Username field type='text' AND autocomplete='username'
+        username_field = wait.until(EC.visibility_of_element_located(
+            (By.CSS_SELECTOR, "input[type='text'][autocomplete='username']")
+        ))
         human_like_typing(username_field, WS_USERNAME)
         
-        password_field = driver.find_element(By.ID, "pass")
+        # Locate Password field type='password'
+        password_field = wait.until(EC.visibility_of_element_located(
+            (By.CSS_SELECTOR, "input[type='password']")
+        ))
         human_like_typing(password_field, WS_PASSWORD)
         
-        driver.find_element(By.ID, "login_button").click()
+        # Locate Login/Submit button
+        login_button = wait.until(EC.element_to_be_clickable(
+            (By.CSS_SELECTOR, "button[type='submit']")
+        ))
+        login_button.click()
+        
+        # Wait for navigation after login
         wait.until(EC.url_to_be("https://windscribe.com/myaccount"))
         
         print_message("INFO", "Selenium login successful.")
         save_cookies()
-    
+        
     except TimeoutException:
-        print_message("ERROR", "Selenium login failed. This could be due to wrong credentials, a CAPTCHA, or a website change.")
+        print_message("ERROR", "Selenium login failed. The login form selectors may have changed or credentials are incorrect.")
         
         os.makedirs(SCREENSHOT_DIR, exist_ok=True)
         screenshot_path = os.path.join(SCREENSHOT_DIR, f"selenium_login_failure_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
