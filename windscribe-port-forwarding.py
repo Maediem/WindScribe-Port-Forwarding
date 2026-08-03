@@ -49,7 +49,7 @@ COOKIES_FILE = os.path.join(ROOT_DIR, "scripts", "windscribe.cookies")
 SCREENSHOT_DIR = os.path.join(ROOT_DIR, "scripts", "screenshots")
 
 # --- Core Settings ---
-LOGIN_METHOD = "flaresolverr"      # "selenium" or "flaresolverr"
+LOGIN_METHOD = "flaresolverr" # "selenium" or "flaresolverr"
 FLARESOLVERR_URL = "http://flaresolverr.example.com/v1" # Only used if LOGIN_METHOD is "flaresolverr"; can use http://<your flaresolverr or server IP address>/v1
 
 # --- Feature Flags ---
@@ -66,10 +66,10 @@ LOG_TO_FILE = True
 
 # --- Manual Credentials (optional) ---
 # If left empty (""), script will fall back to environment variables.
-WS_USERNAME   = ""           # Windscribe username
-WS_PASSWORD   = ""           # Windscribe password
+WS_USERNAME = ""    # Windscribe username
+WS_PASSWORD = ""    # Windscribe password
 
-QBIT_HOST     = ""           # Example: "http://localhost:8080"
+QBIT_HOST = ""      # Example: "http://localhost:8080"
 QBIT_USERNAME = ""           
 QBIT_PASSWORD = ""           
 
@@ -212,12 +212,12 @@ def human_like_typing(element, text):
         element.send_keys(char)
         time.sleep(random.uniform(0.08, 0.48))
 
-# Perform a robust JavaScript click
+# Perform a JavaScript click
 def click_with_javascript(element):
     driver.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'});", element)
     driver.execute_script("arguments[0].click();", element)
 
-# Waits for an element to be clickable, adds a human-like delay, then clicks it robustly
+# Waits for an element to be clickable, adds a human-like delay, then clicks it
 def wait_and_click(by_locator, locator_value, timeout=20):
     try:
         element = WebDriverWait(driver, timeout).until(
@@ -236,15 +236,15 @@ def perform_selenium_login():
     try:
         print_message("INFO", "Performing login actions with Selenium...")
         
-        #username_field = wait.until(EC.visibility_of_element_located((By.ID, "username")))
+        #username_field = wait.until(EC.visibility_of_element_located((By.ID, "username"))) # OLD METHOD
         username_field = wait.until(EC.visibility_of_element_located((By.XPATH, '//input[@aria-label="Username"]')))
         human_like_typing(username_field, WS_USERNAME)
         
-        #password_field = driver.find_element(By.ID, "pass")
+        #password_field = driver.find_element(By.ID, "pass") # OLD METHOD
         password_field = driver.find_element(By.XPATH, '//input[@aria-label="Password"]')
         human_like_typing(password_field, WS_PASSWORD)
         
-        #driver.find_element(By.ID, "login_button").click()
+        #driver.find_element(By.ID, "login_button").click() # OLD METHOD
         login_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[@type="submit"]')))
         login_button.click()
         wait.until(EC.url_to_be("https://windscribe.com/myaccount"))
@@ -461,9 +461,7 @@ try:
     # Extract port (pf-ext takes priority)
     print_message("INFO", "Extracting ephemeral port value...")
 
-    port_xpath = (
-        eph_item_xpath + "//span[contains(@class,'pf-ext') or contains(@class,'pf-int')]"
-    )
+    port_xpath = (eph_item_xpath + "//span[contains(@class,'pf-ext') or contains(@class,'pf-int')]")
     port_elem = wait.until(EC.visibility_of_element_located((By.XPATH, port_xpath)))
     new_port_str = port_elem.text.strip()
 
@@ -477,11 +475,9 @@ except Exception as e:
     print_message("ERROR", f"Critical error in port-forward automation: {e}")
 
     os.makedirs(SCREENSHOT_DIR, exist_ok=True)
-    screenshot_path = os.path.join(
-        SCREENSHOT_DIR,
-        f"failure_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-    )
+    screenshot_path = os.path.join(SCREENSHOT_DIR, f"failure_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
     driver.save_screenshot(screenshot_path)
+    
     print_message("INFO", f"Screenshot saved at {screenshot_path}")
 
     if driver:
