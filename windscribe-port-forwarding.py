@@ -42,15 +42,15 @@ from qbittorrentapi import Client, LoginFailed
 #--------------------------
 
 # --- Paths ---
-ROOT_DIR = "/data/docker" # If empty, defaults to directory of this script.
+ROOT_DIR = "/opt/docker" # If empty, defaults to directory of this script.
 DOCKER_COMPOSE_FILE = os.path.join(ROOT_DIR, "master-docker-compose.yml") # Can change the docker compose file name if using docker
 ENV_FILE = os.path.join(ROOT_DIR, ".env")
-COOKIES_FILE = os.path.join(ROOT_DIR, "scripts", "windscribe.cookies") # This will write the cookie data in the following file: /data/docker/scripts/windscribe.cookies
+COOKIES_FILE = os.path.join(ROOT_DIR, "scripts", "windscribe.cookies")
 SCREENSHOT_DIR = os.path.join(ROOT_DIR, "scripts", "screenshots")
 
 # --- Core Settings ---
-LOGIN_METHOD = "flaresolverr"                 # "selenium" or "flaresolverr"
-FLARESOLVERR_URL = "http://localhost:8191/v1" # Only used if LOGIN_METHOD is "flaresolverr"
+LOGIN_METHOD = "flaresolverr"      # "selenium" or "flaresolverr"
+FLARESOLVERR_URL = "http://flaresolverr.example.com/v1" # Only used if LOGIN_METHOD is "flaresolverr"; can use http://<your flaresolverr or server IP address>/v1
 
 # --- Feature Flags ---
 ENABLE_QBITTORRENT_UPDATE = False  # Enable or disable qBittorrent port update
@@ -70,8 +70,8 @@ WS_USERNAME   = ""           # Windscribe username
 WS_PASSWORD   = ""           # Windscribe password
 
 QBIT_HOST     = ""           # Example: "http://localhost:8080"
-QBIT_USERNAME = ""
-QBIT_PASSWORD = ""
+QBIT_USERNAME = ""           
+QBIT_PASSWORD = ""           
 
 
 #---------------------------------------
@@ -90,6 +90,7 @@ if not os.path.isfile(CREDENTIALS_ENV_FILE):
 # Load environment variables
 load_dotenv(CREDENTIALS_ENV_FILE)
 load_dotenv(ENV_FILE)
+
 ENV_KEY_PORT_FORWARDED  = "VPN_PORT_FORWARDED"
 VPN_PORT_FORWARDED = os.getenv(ENV_KEY_PORT_FORWARDED)
 
@@ -103,7 +104,7 @@ QBIT_PASSWORD = QBIT_PASSWORD or os.getenv("QBIT_PASSWORD", "")
 
 # Docker restart command
 DOCKER_RESTART_CMD = [
-    "docker-compose", "-f", DOCKER_COMPOSE_FILE,
+    "docker compose", "-f", DOCKER_COMPOSE_FILE,
     "up", "-d", "--force-recreate",
     DOCKER_VPN_INSTANCE, DOCKER_QBIT_INSTANCE
 ]
@@ -128,7 +129,7 @@ if LOGIN_METHOD == "flaresolverr":
 # --- Docker validation ---
 if ENABLE_DOCKER_RESTART:
     if not os.path.isfile(DOCKER_COMPOSE_FILE):
-        print(f"[ERROR] Docker restart enabled, but docker-compose file missing:\n{DOCKER_COMPOSE_FILE}")
+        print(f"[ERROR] Docker restart enabled, but docker compose file missing:\n{DOCKER_COMPOSE_FILE}")
         sys.exit(1)
 
 # --- qBittorrent validation ---
@@ -209,7 +210,7 @@ def get_flaresolverr_clean_session(url):
 def human_like_typing(element, text):
     for char in text:
         element.send_keys(char)
-        time.sleep(random.uniform(0.05, 0.2))
+        time.sleep(random.uniform(0.08, 0.48))
 
 # Perform a robust JavaScript click
 def click_with_javascript(element):
@@ -222,7 +223,7 @@ def wait_and_click(by_locator, locator_value, timeout=20):
         element = WebDriverWait(driver, timeout).until(
             EC.element_to_be_clickable((by_locator, locator_value))
         )
-        time.sleep(random.uniform(0.7, 1.8))  # Simulate human pause
+        time.sleep(random.uniform(0.8, 2.4))  # Simulate human pause
         click_with_javascript(element)
         
         print_message("DEBUG", f"Successfully clicked element: {locator_value}", print_only=True)
@@ -235,32 +236,24 @@ def perform_selenium_login():
     try:
         print_message("INFO", "Performing login actions with Selenium...")
         
-        # Locate Username field type='text' AND autocomplete='username'
-        username_field = wait.until(EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, "input[type='text'][autocomplete='username']")
-        ))
+        #username_field = wait.until(EC.visibility_of_element_located((By.ID, "username")))
+        username_field = wait.until(EC.visibility_of_element_located((By.XPATH, '//input[@aria-label="Username"]')))
         human_like_typing(username_field, WS_USERNAME)
         
-        # Locate Password field type='password'
-        password_field = wait.until(EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, "input[type='password']")
-        ))
+        #password_field = driver.find_element(By.ID, "pass")
+        password_field = driver.find_element(By.XPATH, '//input[@aria-label="Password"]')
         human_like_typing(password_field, WS_PASSWORD)
         
-        # Locate Login/Submit button
-        login_button = wait.until(EC.element_to_be_clickable(
-            (By.CSS_SELECTOR, "button[type='submit']")
-        ))
+        #driver.find_element(By.ID, "login_button").click()
+        login_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[@type="submit"]')))
         login_button.click()
-        
-        # Wait for navigation after login
         wait.until(EC.url_to_be("https://windscribe.com/myaccount"))
         
         print_message("INFO", "Selenium login successful.")
         save_cookies()
-        
+    
     except TimeoutException:
-        print_message("ERROR", "Selenium login failed. The login form selectors may have changed or credentials are incorrect.")
+        print_message("ERROR", "Selenium login failed. This could be due to wrong credentials, a CAPTCHA, or a website change.")
         
         os.makedirs(SCREENSHOT_DIR, exist_ok=True)
         screenshot_path = os.path.join(SCREENSHOT_DIR, f"selenium_login_failure_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
@@ -334,7 +327,7 @@ def restart_docker_containers(new_port=None):
                 print_message("DEBUG", f"[DOCKER STDOUT]: {result.stdout}", print_only=True)
         
         except FileNotFoundError:
-            print_message("ERROR", "'docker-compose' not found. Please install it or check your path.")
+            print_message("ERROR", "'docker compose' not found. Please install it or check your path.")
         
         except subprocess.CalledProcessError as e:
             print_message("ERROR", "Docker-compose failed.")
@@ -468,7 +461,9 @@ try:
     # Extract port (pf-ext takes priority)
     print_message("INFO", "Extracting ephemeral port value...")
 
-    port_xpath = (eph_item_xpath + "//span[contains(@class,'pf-ext') or contains(@class,'pf-int')]")
+    port_xpath = (
+        eph_item_xpath + "//span[contains(@class,'pf-ext') or contains(@class,'pf-int')]"
+    )
     port_elem = wait.until(EC.visibility_of_element_located((By.XPATH, port_xpath)))
     new_port_str = port_elem.text.strip()
 
