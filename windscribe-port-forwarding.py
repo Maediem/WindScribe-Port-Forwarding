@@ -11,6 +11,7 @@ import datetime
 import time
 import subprocess
 import random
+import sys
 import email.utils # Needed for parsing cookie expiry dates
 
 # --- Third-Party Packages ---
@@ -82,10 +83,12 @@ QBIT_PASSWORD = ""
 if ROOT_DIR == "":
     ROOT_DIR = os.path.normpath(os.path.dirname(os.path.abspath(__file__)))
 
-# Ensure credentials.env fallback
+# Ensure fallback for .env file
 CREDENTIALS_ENV_FILE = os.path.join(ROOT_DIR, "scripts", "credentials.env")
 if not os.path.isfile(CREDENTIALS_ENV_FILE):
     CREDENTIALS_ENV_FILE = os.path.join(ROOT_DIR, "credentials.env")
+    if not os.path.isfile(CREDENTIALS_ENV_FILE):
+        CREDENTIALS_ENV_FILE = os.path.join(ROOT_DIR, ".env")
 
 # Load environment variables
 load_dotenv(CREDENTIALS_ENV_FILE)
@@ -419,49 +422,99 @@ else:
 new_port = None
 try:
     print_message("INFO", "Navigating to Windscribe's port forwarding page...")
-    wait_and_click(By.ID, "menu-ports")
-    wait.until(EC.presence_of_element_located((By.ID, "ports-main-tab")))
 
-    print_message("INFO", "Looking for existing Ephemeral Port (fully dynamic)...")
+    # Old method
+    #wait_and_click(By.ID, "menu-ports")
+    #wait.until(EC.presence_of_element_located((By.ID, "ports-main-tab")))
+    
+    wait_and_click(By.XPATH, "//a[.//span[contains(text(), 'Port Forwarding')]]")
+    wait.until(EC.presence_of_element_located((By.XPATH, "//span[contains(normalize-space(), 'Ephemeral Port Forwards')]")))
 
-    # Dynamic, case-insensitive match for "Ephemeral Port" anywhere within a pf-item
+    print_message("INFO", "Checking for existing Ephemeral Port...")
+
+    # =========================================
+    # Finding active ephemeral port & delete it
+    # =========================================
     eph_item_xpath = (
-        "//div[contains(@class,'pf-item') and "
-        "contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'ephemeral port')]"
+        "//div["
+        "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'row') "
+        "and .//span[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'active ephemeral port')]"
+        "]"
     )
 
     try:
-        eph_item = wait.until(EC.presence_of_element_located((By.XPATH, eph_item_xpath)))
+        wait.until(EC.presence_of_element_located((By.XPATH, eph_item_xpath)))
         print_message("INFO", "Ephemeral Port entry found.")
 
-        # Find the toggle button inside this pf-item
-        toggle_btn = eph_item.find_element(By.CSS_SELECTOR, "button.pf-info-toggle")
-        toggle_btn.click()
-        print_message("INFO", "Opened EPF menu.")
+        # Find the delete button
+        delete_btn_xpath = (
+            f"{eph_item_xpath}//button["
+            "contains(translate(@title, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'delete') "
+            "or contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'delete') "
+            "or contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'delete')"
+            "]"
+        )
+        
+        wait_and_click(By.XPATH, delete_btn_xpath)
+        print_message("INFO", "Clicked delete button, waiting for confirmation modal...")
 
-        # Click "Delete" from the dropdown (dynamic text match)
-        delete_xpath = ".//li[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'delete')]"
-        delete_option = wait.until(EC.element_to_be_clickable((By.XPATH, delete_xpath)))
-        delete_option.click()
+        # Click the delete port button (pop-up)
+        confirm_delete_xpath = (
+            "//button["
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'confirm') "
+            "and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'delete port')"
+            "]"
+        )
+        
+        wait_and_click(By.XPATH, confirm_delete_xpath)
 
-        # Wait for deletion to finish
+        # Wait for the old row to completely disappear
         wait.until(EC.invisibility_of_element_located((By.XPATH, eph_item_xpath)))
-        print_message("INFO", "Old Ephemeral Port deleted.")
-
+        print_message("INFO", "Old Ephemeral Port successfully deleted.")
     except TimeoutException:
         print_message("INFO", "No existing Ephemeral Port found. Continuing...")
 
+    # ==================
     # Request a new port
+    # ==================
     print_message("INFO", "Requesting a new ephemeral port...")
     try:
-        wait_and_click(By.XPATH, "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'), 'request') and contains(., 'Port')]")
+        # Requesting port button on main page
+        request_btn_xpath = (
+            "//button[contains("
+            "translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
+            "'request port')]"
+        )
+        
+        wait_and_click(By.XPATH, request_btn_xpath)
+        
+        # Requesting port on pop-up (confirmation)
+        confirm_xpath = (
+            "//button["
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'confirm') "
+            "and contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'request port')"
+            "]"
+        )
+        
+        wait_and_click(By.XPATH, confirm_xpath)
     except Exception:
         print_message("WARNING", "Request button not found; proceeding to read existing port if present.")
 
-    # Extract port (pf-ext takes priority)
+    # ============
+    # Extract port
+    # ============
     print_message("INFO", "Extracting ephemeral port value...")
 
-    port_xpath = (eph_item_xpath + "//span[contains(@class,'pf-ext') or contains(@class,'pf-int')]")
+    # Get the active ephemeral port section
+    eph_item_xpath = (
+        "//div["
+        "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'row') "
+        "and .//span[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'active ephemeral port')]"
+        "]"
+    )
+
+    # Get the port
+    port_xpath = f"{eph_item_xpath}/span[1]"
     port_elem = wait.until(EC.visibility_of_element_located((By.XPATH, port_xpath)))
     new_port_str = port_elem.text.strip()
 
